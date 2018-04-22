@@ -1,0 +1,41 @@
+buildscript {
+    ext.kotlin_version = '1.2.31'
+    ext.serialization_version = '0.4.2'
+    ext.coroutines_version = '0.22.5'
+    ext.kool_version = '0.1.0'
+
+    repositories {
+        jcenter()
+        mavenCentral()
+        maven { url "https://kotlin.bintray.com/kotlinx" }
+    }
+
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath "org.jetbrains.kotlinx:kotlinx-gradle-serialization-plugin:$serialization_version"
+    }
+}
+
+allprojects {
+    group 'de.fabmax'
+    version '0.0.1'
+
+    repositories {
+        jcenter()
+        mavenCentral()
+        mavenLocal()
+        maven { url "https://kotlin.bintray.com/kotlinx" }
+        maven { url "https://dl.bintray.com/fabmax/kool" }
+    }
+}
+
+task clean(group: 'build') {
+    delete "${projectDir}/dist"
+}
+
+task dist(dependsOn: ':pclv-jvm:fatJar', group: 'build') {
+    copy  {
+        from "${project('pclv-jvm').buildDir}/libs/pclv-${version}.jar"
+        into "${projectDir}/dist"
+    }
+}

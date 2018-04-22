@@ -1,0 +1,36 @@
+apply plugin: 'kotlin-platform-js'
+apply plugin: 'kotlinx-serialization'
+
+compileKotlin2Js {
+    kotlinOptions.outputFile = "${buildDir}/web/pclv-js/pclv.js"
+    kotlinOptions.moduleKind = "amd"
+    kotlinOptions.sourceMap = false
+}
+
+dependencies {
+    expectedBy project(":pclv-common")
+
+    compile "org.jetbrains.kotlin:kotlin-stdlib-js:$kotlin_version"
+    compile "org.jetbrains.kotlinx:kotlinx-serialization-runtime-js:$serialization_version"
+    compile "de.fabmax:kool-core-js:$kool_version"
+}
+
+build.doLast {
+    configurations.compile.each { file ->
+        copy {
+            includeEmptyDirs = false
+
+            from zipTree(file.absolutePath)
+            into "${buildDir}/web/pclv-js"
+            include { fileTreeElement ->
+                def path = fileTreeElement.path
+                path.endsWith(".js") && (path.startsWith("META-INF/resources/") || !path.startsWith("META-INF/"))
+            }
+        }
+    }
+
+    copy {
+        from sourceSets.main.resources.srcDirs
+        into "${buildDir}/web/pclv-js"
+    }
+}

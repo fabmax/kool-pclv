@@ -1,0 +1,5 @@
+rootProject.name = 'kool-pclv'
+
+include 'pclv-common'
+include 'pclv-jvm'
+include 'pclv-js'
