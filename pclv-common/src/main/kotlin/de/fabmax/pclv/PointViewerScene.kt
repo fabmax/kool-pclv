@@ -88,10 +88,16 @@ open class PointViewerScene(ctx: KoolContext, requestTransmitter: (CamRequest) -
             }
             content.ui.setCustom(BlankComponentUi())
 
-            +drawerMenu("menu", "Demos") {
+            +drawerMenu("menu", "Settings") {
                 // no nice layouting functions yet, choose start y such that menu items start somewhere below the title
                 // negative value means it's measured from top
                 var y = -105f
+                +label("No Settings Yet...") {
+                    layoutSpec.setOrigin(zero(), dps(y, true), zero())
+                    layoutSpec.setSize(pcs(100f, true), dps(30f, true), zero())
+                    textAlignment = Gravity(Alignment.START, Alignment.CENTER)
+                    y -= 35f
+                }
 
                 +toggleButton("showDbg") {
                     layoutSpec.setOrigin(zero(), dps(10f, true), zero())
