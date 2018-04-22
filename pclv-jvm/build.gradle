@@ -7,6 +7,20 @@ buildscript {
         jcenter()
         mavenCentral()
     }
+
+    // lwjgl runtime dependencies, needed for local visualizer
+    ext.lwjglVersion = '3.1.5'
+    switch (org.gradle.internal.os.OperatingSystem.current()) {
+        case org.gradle.internal.os.OperatingSystem.WINDOWS:
+            ext.lwjglNatives = "natives-windows"
+            break
+        case org.gradle.internal.os.OperatingSystem.LINUX:
+            ext.lwjglNatives = "natives-linux"
+            break
+        case org.gradle.internal.os.OperatingSystem.MAC_OS:
+            ext.lwjglNatives = "natives-macos"
+            break
+    }
 }
 
 apply plugin: 'kotlin-platform-jvm'
@@ -27,7 +41,7 @@ protobuf {
     protoc {
         artifact = 'com.google.protobuf:protoc:3.5.1-1'
     }
-    generatedFilesBaseDir = "$projectDir/src/main/generated"
+    generatedFilesBaseDir = "$projectDir/src/generated"
 }
 
 idea {
@@ -50,25 +64,16 @@ dependencies {
 
     testCompile "org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version"
 
+    runtime "org.lwjgl:lwjgl:${lwjglVersion}:${lwjglNatives}"
+    runtime "org.lwjgl:lwjgl-glfw:${lwjglVersion}:${lwjglNatives}"
+    runtime "org.lwjgl:lwjgl-jemalloc:${lwjglVersion}:${lwjglNatives}"
+    runtime "org.lwjgl:lwjgl-opengl:${lwjglVersion}:${lwjglNatives}"
 }
 
 clean {
     delete "${sourceSets.main.resources.srcDirs.toArray()[0]}/pclv-js"
     delete "${protobuf.generatedFilesBaseDir}"
 }
-
-/*build.doLast {
-    copy {
-        includeEmptyDirs = false
-
-        from "${projectDir}/../pclv-js/build/web"
-        into "${sourceSets.main.resources.srcDirs.toArray()[0]}/pclv-js"
-        include { fileTreeElement ->
-            def path = fileTreeElement.path
-            (path.endsWith(".js") || path.endsWith(".html")) && (path.startsWith("META-INF/resources/") || !path.startsWith("META-INF/"))
-        }
-    }
-}*/
 
 task fatJar(type: Jar, dependsOn: [':pclv-js:build', 'build']) {
     manifest {

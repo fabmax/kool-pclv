@@ -1,8 +1,16 @@
 package de.fabmax.pclv.srv
 
+import de.fabmax.kool.shading.AttributeType
 import de.fabmax.kool.util.Log
 import de.fabmax.kool.util.logD
+import de.fabmax.kool.util.serialization.AttributeList
+import de.fabmax.kool.util.serialization.MeshData
+import de.fabmax.kool.util.serialization.PrimitiveType
+import de.fabmax.pclv.messaging.CamRequest
+import de.fabmax.pclv.messaging.VisibleNodes
+import de.fabmax.pclv.pointTree.CameraQuery
 import de.fabmax.pclv.pointTree.OcTree
+import de.fabmax.pclv.pointTree.OcTreeNode
 import de.fabmax.pclv.pointTree.Point
 import fi.iki.elonen.NanoHTTPD
 import org.java_websocket.WebSocket
@@ -14,20 +22,64 @@ import java.io.InputStream
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 
-class PclvServer(val pointCloud: OcTree<Point>, httpPort: Int = 8080, visualizeClients: Boolean) {
+class PclvServer(val pointCloud: OcTree<Point>, httpPort: Int, isDaemon: Boolean) {
 
     private val httpServer = HttpSrv(httpPort)
     private val wsServer = WebSocketSrv(InetSocketAddress("0.0.0.0", 8887))
 
-    val clientVisualizer: ClientVisualizer? = if (visualizeClients) { ClientVisualizer() } else { null }
+    //private val clientVisualizer: ClientVisualizer? = if (visualizeClients) { ClientVisualizer() } else { null }
+    private val clientVisualizer: ClientVisualizer? = null
 
     init {
-        httpServer.start()
+        httpServer.start(NanoHTTPD.SOCKET_READ_TIMEOUT, isDaemon)
         wsServer.start()
     }
 
-    private class HttpSrv(private val port: Int = 8080) : NanoHTTPD(port) {
+    fun close() {
+        httpServer.closeAllConnections()
+        wsServer.stop()
+    }
 
+    fun handleCamRequest(camRequest: CamRequest): Pair<VisibleNodes, List<MeshData>> {
+        val clientCam = CameraQuery()
+        camRequest.apply {
+            clientCam.setup(pos.toVec3f(), lookAt.toVec3f(), viewW, viewH, fovy)
+        }
+
+        val nodes = pointCloud.collectNodesInFrustum(clientCam, 1000, 1_500_000)
+        clientVisualizer?.setClient(camRequest, nodes)
+
+        val visibleNodes = mutableSetOf<String>()
+        visibleNodes += nodes.map { nd -> nd.nodeName }
+
+        logD { "Got ${nodes.size} nodes containing ${nodes.sumBy { it.numPoints.toInt() }} points" }
+
+        // remove all nodes the client already has
+        nodes.removeAll { camRequest.presentNodes.contains(it.nodeName) }
+        return Pair(VisibleNodes(visibleNodes), nodes.map { it.toMeshData() })
+    }
+
+    private fun OcTreeNode<Point>.toMeshData(): MeshData {
+        val positions = mutableListOf<Float>()
+        val colors = mutableListOf<Float>()
+
+        for (pt in loadPoints()) {
+            positions += pt.x
+            positions += pt.y
+            positions += pt.z
+
+            colors += pt.color.r
+            colors += pt.color.g
+            colors += pt.color.b
+            colors += pt.color.a
+        }
+
+        val attribs = mapOf(MeshData.ATTRIB_POSITIONS to AttributeList(AttributeType.VEC_3F, positions),
+                MeshData.ATTRIB_COLORS to AttributeList(AttributeType.COLOR_4F, colors))
+        return MeshData(nodeName, PrimitiveType.POINTS, attribs)
+    }
+
+    private class HttpSrv(private val port: Int = 8080) : NanoHTTPD(port) {
         override fun start() {
             super.start()
             Log.i(TAG) { "Waiting for HTTP connections on port $port..." }

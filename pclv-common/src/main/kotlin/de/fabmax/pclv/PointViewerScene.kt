@@ -1,35 +1,48 @@
-import de.fabmax.kool.createContext
+package de.fabmax.pclv
+
+import de.fabmax.kool.KoolContext
 import de.fabmax.kool.math.MutableVec2f
 import de.fabmax.kool.math.MutableVec3f
 import de.fabmax.kool.math.Vec3f
 import de.fabmax.kool.scene.*
+import de.fabmax.kool.scene.ui.*
 import de.fabmax.kool.util.debugOverlay
-import de.fabmax.kool.util.logD
 import de.fabmax.kool.util.pointMesh
 import de.fabmax.kool.util.serialization.MeshData
 import de.fabmax.pclv.messaging.CamRequest
 import de.fabmax.pclv.messaging.SerVec3f
 import de.fabmax.pclv.messaging.VisibleNodes
-import kotlin.browser.window
 
-fun main() {
-    PointViewerScene()
-}
-
-class PointViewerScene {
-    private val wsClient = WebSocketClient("ws://${window.location.hostname}:8887")
+open class PointViewerScene(ctx: KoolContext, requestTransmitter: (CamRequest) -> Unit) {
     private var lastRequestT = 0.0
 
     private val lastPos = MutableVec3f()
     private val lastVpSize = MutableVec2f()
     private val vpSize = MutableVec2f()
 
-    private val pointScene: Scene
     private val pointGroup = PointGroup()
 
+    protected val debugOverlay = debugOverlay(ctx)
+    protected val pointScene: Scene
+
+    private var visibleNodes: VisibleNodes? = null
+    private val addPoints = mutableListOf<MeshData>()
+
     init {
-        val ctx = createContext()
         pointScene = scene {
+            onPreRender += {
+                if (visibleNodes != null || addPoints.isNotEmpty()) {
+                    synchronized(addPoints) {
+                        visibleNodes?.let { pointGroup.setVisibleNodes(it) }
+                        visibleNodes = null
+                        addPoints.forEach {
+                            pointGroup.addPoints(it)
+                        }
+                        addPoints.clear()
+                    }
+                }
+            }
+
             +sphericalInputTransform {
                 verticalAxis = Vec3f.Z_AXIS
                 horizontalRotation = 90f
@@ -58,7 +71,8 @@ class PointViewerScene {
                         val lookAt = SerVec3f(camera.globalLookAt)
                         val vpW = ctx.viewport.width
                         val vpH = ctx.viewport.height
-                        wsClient.send(CamRequest(pos, lookAt, cam.fovy, vpW, vpH, pointGroup.getNodeNames()).asMessage())
+
+                        requestTransmitter(CamRequest(pos, lookAt, cam.fovy, vpW, vpH, pointGroup.getNodeNames()))
                     }
 
                 }
@@ -66,11 +80,42 @@ class PointViewerScene {
             +pointGroup
         }
         ctx.scenes += pointScene
-        ctx.scenes += debugOverlay(ctx)
-        ctx.run()
 
-        wsClient.installHandler("meshData", { meshData!! }) { pointGroup.addPoints(it) }
-        wsClient.installHandler("visibleNodes", { visibleNodes!! }) {pointGroup.setVisibleNodes(it) }
+        ctx.scenes += uiScene(ctx.screenDpi) {
+            theme = theme(UiTheme.DARK) {
+                componentUi { BlankComponentUi() }
+                containerUi(::BlurredComponentUi)
+            }
+            content.ui.setCustom(BlankComponentUi())
+
+            +drawerMenu("menu", "Demos") {
+                // no nice layouting functions yet, choose start y such that menu items start somewhere below the title
+                // negative value means it's measured from top
+                var y = -105f
+
+                +toggleButton("showDbg") {
+                    layoutSpec.setOrigin(zero(), dps(10f, true), zero())
+                    layoutSpec.setSize(pcs(100f, true), dps(30f, true), zero())
+                    text = "Debug Info"
+                    isEnabled = debugOverlay.isVisible
+
+                    onClick += { _, _, _ -> debugOverlay.isVisible = isEnabled }
+                }
+            }
+        }
+        ctx.scenes += debugOverlay
+    }
+
+    fun setVisibleNodes(visibleNodes: VisibleNodes) {
+        synchronized(addPoints) {
+            this.visibleNodes = visibleNodes
+        }
+    }
+
+    fun addPoints(pointData: MeshData) {
+        synchronized(addPoints) {
+            addPoints.add(pointData)
+        }
     }
 
     inner class PointGroup : Group() {
@@ -118,7 +163,6 @@ class PointViewerScene {
                 }
             }
 
-            logD { "Visible nodes: c: ${children.size}, ar: ${children.size - removeNodes.size}, f: ${visibleNodes.size}" }
             removeNodes.forEach { node ->
                 removeNode(node)
                 pointScene.dispose(node)

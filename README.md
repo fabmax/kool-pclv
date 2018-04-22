@@ -16,12 +16,18 @@ Build the project with:
 ./gradlew dist
 ```
 
-Then start the server with
+Then start the server with:
 ```
-java -jar ./dist/pclv-0.0.1.jar -d [path to pointcloud data]
+# open up an http port for web-viewing point clouds
+# slower than local variant below, but works remotely
+java -jar ./dist/pclv-0.0.1.jar -d [path to point cloud data]
+
+# or launch the visualizer window
+# much faster, but only local
+java -jar ./dist/pclv-0.0.1.jar -v -d [path to point cloud data]
 ```
 
-The server opens up a port on 8080 (can be changed with -p [port]). Open
+The server opens up an http interface on port 8080 (can be changed with -p [port]). Open
 [http://localhost:8080](http://localhost:8080) with the browser of your choice and start viewing point clouds!
 
 ### Point cloud data

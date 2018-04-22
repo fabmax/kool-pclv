@@ -2,7 +2,7 @@ buildscript {
     ext.kotlin_version = '1.2.31'
     ext.serialization_version = '0.4.2'
     ext.coroutines_version = '0.22.5'
-    ext.kool_version = '0.1.0'
+    ext.kool_version = '0.1.1'
 
     repositories {
         jcenter()
@@ -23,7 +23,6 @@ allprojects {
     repositories {
         jcenter()
         mavenCentral()
-        mavenLocal()
         maven { url "https://kotlin.bintray.com/kotlinx" }
         maven { url "https://dl.bintray.com/fabmax/kool" }
     }

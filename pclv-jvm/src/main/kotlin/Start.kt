@@ -1,9 +1,11 @@
+import de.fabmax.kool.createContext
 import de.fabmax.kool.util.Log
-import de.fabmax.pclv.pointTree.OcTree
-import de.fabmax.pclv.pointTree.Point
 import de.fabmax.pclv.pointImport.loadPointTree
+import de.fabmax.pclv.pointTree.OcTree
 import de.fabmax.pclv.pointTree.OnDiskOcTree
+import de.fabmax.pclv.pointTree.Point
 import de.fabmax.pclv.srv.PclvServer
+import de.fabmax.pclv.viewer.JvmViewer
 import org.apache.commons.cli.*
 import java.io.File
 import java.io.FileNotFoundException
@@ -12,17 +14,27 @@ fun main(args: Array<String>) {
     try {
         var httpPort = 8080
         var dataPath: String? = null
-        var visualizeClients = false
+        var localVisualizer = false
         DefaultParser().parse(buildOptions(), args).options.forEach {
             when (it.opt) {
                 "h" -> printHelp()
                 "p" -> httpPort = parseInt(it.value)
                 "d" -> dataPath = it.value
-                "v" -> visualizeClients = true
+                "v" -> localVisualizer = true
             }
         }
 
-        PclvServer(loadData(dataPath), httpPort, visualizeClients)
+        val srv = PclvServer(loadData(dataPath), httpPort, localVisualizer)
+
+        if (localVisualizer) {
+            // launch local visualizer
+            val ctx = createContext()
+            JvmViewer(ctx, srv)
+            ctx.run()
+
+            // when ctx.run() returns window was closed -> shutdown server and exit
+            srv.close()
+        }
 
     } catch (e: ParseException) {
         Log.e(PclvServer.TAG) { "Failed parsing command line arguments: $e" }
@@ -77,8 +89,8 @@ private fun buildOptions(): Options {
             .build())
 
     options.addOption(Option.builder("v")
-            .longOpt("visualize-clients")
-            .desc("Shows a debug view with client position and transmitted content")
+            .longOpt("local-visualizer")
+            .desc("Open a local visualizer window (faster than WebGL)")
             .build())
 
 
